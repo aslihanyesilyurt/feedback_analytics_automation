@@ -1,0 +1,6 @@
+feedback_id,feedback_text,source,user_segment,feature_area,reference_category,reference_theme,notes
+SYN-001,The analytics dashboard takes a long time to load.,Support,SMB,Analytics dashboard,Performance,Dashboard Performance,Synthetic example
+SYN-002,Please let me export headcount reports to CSV.,Feature Request,Enterprise,Reporting,Feature Request,Reporting and Export,Synthetic example
+SYN-003,I cannot reset my password after the latest update.,Support,Free,Authentication,Bug,Login and Access,Synthetic example
+SYN-004,I am not sure where to find the onboarding checklist.,Interview,SMB,Onboarding,Usability,Onboarding and Usability,Synthetic example
+SYN-005,Something seems wrong.,Survey,Unknown,,Other,Other,Synthetic ambiguous example

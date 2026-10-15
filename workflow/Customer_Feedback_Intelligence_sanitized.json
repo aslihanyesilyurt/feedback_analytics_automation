@@ -1,0 +1,348 @@
+{
+  "name": "Customer Feedback Intelligence",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_INPUT_SPREADSHEET_ID/edit?gid=291727564#gid=291727564",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 291727564,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_INPUT_SPREADSHEET_ID/edit#gid=291727564"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "7cbc8a3b-71e6-4b6d-95e2-5b02fdafcc69",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f8e229aa-1a27-4c41-a806-ca335d006a36",
+              "name": "=feedback_id",
+              "value": "=FB-{{ $execution.id }}-{{ $itemIndex + 1 }}",
+              "type": "string"
+            },
+            {
+              "id": "373e2105-9899-4e29-aa60-5f94434de880",
+              "name": "timestamp",
+              "value": "={{ $json.Timestamp }}",
+              "type": "string"
+            },
+            {
+              "id": "3549598a-4284-4c9c-8dd1-d7d6ef7d2324",
+              "name": "feedback_text",
+              "value": "={{ $json['Customer Feedback'] }}",
+              "type": "string"
+            },
+            {
+              "id": "1184958d-c598-470d-bade-f41874ea06ea",
+              "name": "user_segment",
+              "value": "={{ $json['Please select the option that defines the business best.'] }}",
+              "type": "string"
+            },
+            {
+              "id": "cc17239a-1970-4264-90cd-24556b8646d7",
+              "name": "source",
+              "value": "={{ $json['What\\'s the feedback about?'] }}",
+              "type": "string"
+            },
+            {
+              "id": "9ff774f8-5b1d-4985-a4a1-d42f40729ebe",
+              "name": "needs_review",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d5a1266a-af77-4d58-b139-c5940482c3a2",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Normalize text: lowercase, straighten curly apostrophes,\n// normalize common punctuation/whitespace.\nconst raw = String($json.feedback_text || \"\").trim();\n\nconst text = raw\n  .toLowerCase()\n  .replace(/[\\u2018\\u2019]/g, \"'\")\n  .replace(/[\\u201C\\u201D]/g, '\"')\n  .replace(/\\s+/g, \" \")\n  .trim();\n\nlet category = \"Other\";\n\n/*\n * CATEGORY\n *\n * Order matters:\n * 1. Very specific operational/data problems first\n * 2. Security/access/integration problems\n * 3. Performance/bugs\n * 4. Feature requests\n * 5. Usability/praise\n */\n\n// Support follow-up / ticket status\nif (\n  /waiting for (an )?(update|response|reply)|get back to me|follow[- ]?up|update on (our|my) (request|ticket|issue)|request no\\.?|ticket (no|#)|status of (my|our) (request|ticket)/.test(text)\n) {\n  category = \"Support Follow-up\";\n\n// Data accuracy / incorrect or inconsistent numbers\n} else if (\n  /incorrect|wrong|inaccurate|doesn't match|does not match|didn't match|did not match|mismatch|discrepanc|numbers (are|were) wrong|headcount .* (wrong|incorrect)|figures .* (wrong|incorrect)|data .* (wrong|incorrect)|missing .* (employees|records)|employees .* missing|record(s)? .* missing|csv export .* missing|export .* missing|data completeness/.test(text)\n) {\n  category = \"Data Accuracy\";\n\n// Data synchronization / freshness\n} else if (\n  /sync|synchroni[sz]|last synced|last sync|data freshness|real[- ]?time|real time|updated in real time|data .* (stale|out of date)|stale data|when .* updated|timestamp .* data/.test(text)\n) {\n  category = \"Data Sync\";\n\n// Import / data ingestion\n} else if (\n  /import|upload|spreadsheet|employee file|file format|rejected rows|rows .* rejected|failed import|import failed|upload failed|couldn't import|could not import|can't import|cannot import|unable to import/.test(text)\n) {\n  category = \"Data Import\";\n\n// Access control / permissions / authentication\n} else if (\n  /role[- ]based|role based|permissions?|permission level|access control|access controls|restricted access|report[- ]level permissions?|who can (view|see|edit)|sensitive .* (data|information)|ss o|sso|single sign[- ]on|identity provider|okta|authentication|invite another admin|admin access/.test(text)\n) {\n  category = \"Access & Security\";\n\n// Integrations / API\n} else if (\n  /integrat(e|ion|ions|ing)|hris|payroll system|slack|microsoft teams|teams notifications?|api\\b|internal dashboard|connect .* system|connect .* platform|pull .* data .* (dashboard|system)/.test(text)\n) {\n  category = \"Integration\";\n\n// Reporting / exports\n} else if (\n  /export|download|csv|excel|pdf|report(s)?|scheduled report|schedule .* report|emailed .* report|email .* report|weekly .* report|monthly .* report|custom report|historical reports?|customize reports?/.test(text)\n) {\n  category = \"Reporting & Export\";\n\n// Performance\n} else if (\n  /slow|too slow|lag|laggy|loading|load(ed|s)? (slow|faster)|performance|takes too long|take(s)? forever|time(s|d)? ?out|tim(e|ing) out|30[- ]?60 seconds|two minutes|few seconds|peak hours?|reporting cycle/.test(text)\n) {\n  category = \"Performance\";\n\n// Bugs / crashes / failures\n} else if (\n  /crash|crashes|crashed|broken|bug|fail|failed|failure|doesn't work|does not work|not working|isn't working|is not working|haven't been working|stopped working|can't open|cannot open|unable to save|unable to .* changes|lost changes|page .* crash|filter .* crash|filters? reset|custom field .* disappeared|disappeared from reports?/.test(text)\n) {\n  category = \"Bug\";\n\n// Analytics / insights\n} else if (\n  /actionable insights?|recommendations?|recommended dashboard|suggested next steps?|turnover .* (why|increasing)|why .* turnover|attrition risk|predictive analytics|predictive|contributing factors?|employee engagement|workforce trends?|business performance|workforce planning|headcount planning|hiring needs?/.test(text)\n) {\n  category = \"Analytics & Insights\";\n\n// Benchmarking\n} else if (\n  /benchmark|benchmarking|industry data|industry benchmark|compare .* (companies|company)|similar size|same industry|industry-specific|anonymized industry/.test(text)\n) {\n  category = \"Benchmarking\";\n\n// Audit / compliance\n} else if (\n  /audit logs?|audit trail|who viewed|who edited|who exported|who deleted|viewed .* sensitive|edited .* sensitive|exported .* sensitive|deleted .* sensitive|compliance deadline|compliance alert/.test(text)\n) {\n  category = \"Audit & Compliance\";\n\n// Customization / bulk operations\n} else if (\n  /customiz(e|ation)|customise|custom field|custom fields?|change the date range|comparison period|metrics shown|custom charts?|customize charts?|bulk edit|bulk editing|update .* (50|multiple|many) employees|dark mode|multi[- ]language|multiple languages?|localized reports?/.test(text)\n) {\n  category = \"Customization\";\n\n// Pricing\n} else if (\n  /pricing|price|cost|expensive|justify .* cost|plan .* grow|growing (business|team)|flexible plan|pricing .* (team|business)|team grows/.test(text)\n) {\n  category = \"Pricing\";\n\n// Usability / onboarding / discoverability\n} else if (\n  /confus|difficult|can't find|cannot find|don't understand|do not understand|how to|find my way|not sure (where|which|how)|where (should|do) i|where .* (reports?|dashboard)|too many clicks?|many clicks?|hard to figure out|hard to use|figure out|trouble finding|discover|getting started|start with|setup|set up|onboarding|tutorial|step[- ]by[- ]step|guided setup|recommended dashboard|terminology|term .* (mean|means)|tooltip|tooltips|explanation|mobile|zoom in|buttons overlap|unusable|self[- ]sufficient/.test(text)\n) {\n  category = \"Usability\";\n\n// Praise\n} else if (\n  /enjoy|love|great|thank|really like|awesome|helpful|useful|looks good|good product|promising|intuitive|powerful|valuable|nice/.test(text)\n) {\n  category = \"Praise\";\n}\n\n\n/*\n * URGENCY\n *\n * High:\n * - operationally blocking issues\n * - incorrect/missing business data\n * - security/access issues\n * - data loss\n * - compliance\n * - crashes/broken functionality\n * - explicit urgency\n *\n * Low:\n * - praise\n * - ordinary feature requests/customization\n *\n * Otherwise Medium.\n */\n\nlet urgency = \"Medium\";\n\nconst explicitHighUrgency =\n  /asap|urgent|immediately|critical|blocking|block(ed|ing)|daily operations|our processes|cannot operate|can't operate/.test(text);\n\nconst highImpactData =\n  /incorrect|wrong|inaccurate|doesn't match|does not match|mismatch|missing .* employees|employees .* missing|data completeness|data loss|lost changes|lost data/.test(text);\n\nconst highImpactSecurity =\n  /sensitive employee information|sensitive data|unauthorized|access control|role[- ]based|permission|sso|single sign[- ]on|authentication|compliance deadline|audit log/.test(text);\n\nconst highImpactFailure =\n  /crash|crashes|crashed|broken|failed|failure|unable to save|lost changes|not working|doesn't work|does not work/.test(text);\n\nif (\n  explicitHighUrgency ||\n  highImpactData ||\n  highImpactSecurity ||\n  highImpactFailure\n) {\n  urgency = \"High\";\n} else if (\n  category === \"Praise\" ||\n  category === \"Feature Request\" ||\n  category === \"Customization\"\n) {\n  urgency = \"Low\";\n}\n\n\n/*\n * REVIEW\n *\n * Review very short/ambiguous feedback and feedback that\n * couldn't be confidently classified.\n */\n\nconst needs_review =\n  category === \"Other\" ||\n  text.length < 10 ||\n  /^(not sure|unsure|idk|unknown|n\\/a)$/.test(text);\n\n\n/*\n * THEME\n *\n * More granular than the original theme rules.\n * The first matching theme wins.\n */\n\nconst feedback = text;\n\nlet theme = \"Other\";\n\nif (\n  /slow|too slow|lag|loading|performance|takes too long|take(s)? forever|time(s|d)? ?out|30[- ]?60 seconds|two minutes|peak hours?|reporting cycle/.test(feedback)\n) {\n  theme = \"Dashboard Performance\";\n\n} else if (\n  /export|download|csv|excel|pdf|report(s)?|scheduled report|custom report|historical reports?|email .* report/.test(feedback)\n) {\n  theme = \"Reporting and Export\";\n\n} else if (\n  /password|login|sign in|log in|authentication|sso|single sign[- ]on|identity provider|okta|role[- ]based|permissions?|access control/.test(feedback)\n) {\n  theme = \"Login and Access\";\n\n} else if (\n  /onboarding|getting started|guided setup|tutorial|step[- ]by[- ]step|confus|difficult|can't find|cannot find|don't understand|too many clicks?|discover|terminology|tooltip|mobile|unusable/.test(feedback)\n) {\n  theme = \"Onboarding and Usability\";\n\n} else if (\n  /incorrect|wrong|inaccurate|doesn't match|does not match|mismatch|discrepanc|headcount .* (wrong|incorrect)|figures .* (wrong|incorrect)/.test(feedback)\n) {\n  theme = \"Data Accuracy\";\n\n} else if (\n  /sync|synchroni[sz]|last synced|last sync|real[- ]?time|stale data|data freshness|timestamp/.test(feedback)\n) {\n  theme = \"Data Synchronization\";\n\n} else if (\n  /import|upload|spreadsheet|employee file|file format|rejected rows|failed import|import failed/.test(feedback)\n) {\n  theme = \"Data Import\";\n\n} else if (\n  /integrat(e|ion|ions|ing)|hris|payroll|api\\b|internal dashboard/.test(feedback)\n) {\n  theme = \"Integrations\";\n\n} else if (\n  /benchmark|benchmarking|industry data|industry benchmark|similar size|same industry|anonymized industry/.test(feedback)\n) {\n  theme = \"Benchmarking\";\n\n} else if (\n  /attrition|turnover|engagement|predictive analytics|predictive|actionable insights?|recommendations?|suggested next steps?|workforce planning|headcount planning|hiring needs?/.test(feedback)\n) {\n  theme = \"Analytics and Insights\";\n\n} else if (\n  /audit logs?|audit trail|who viewed|who edited|who exported|who deleted|compliance deadline|compliance alert/.test(feedback)\n) {\n  theme = \"Audit and Compliance\";\n\n} else if (\n  /customiz(e|ation)|customise|custom field|bulk edit|bulk editing|dark mode|multi[- ]language|localized reports?/.test(feedback)\n) {\n  theme = \"Customization\";\n\n} else if (\n  /pricing|price|cost|expensive|justify .* cost|flexible plan|growing (business|team)/.test(feedback)\n) {\n  theme = \"Pricing\";\n}\n\n\n/*\n * Return original payload plus classification fields.\n */\nreturn {\n  ...$json,\n  category,\n  urgency,\n  needs_review,\n  theme\n};"
+      },
+      "id": "6ae3acd4-b6d3-4298-8d62-05d805e205a3",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_OUTPUT_SPREADSHEET_ID/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feedback",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_OUTPUT_SPREADSHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "feedback_id": "={{ $json.feedback_id }}",
+            "feedback_text": "={{ $json.feedback_text }}",
+            "source": "={{ $json.source }}",
+            "user_segment": "={{ $json.user_segment }}",
+            "timestamp": "={{ $json.timestamp }}",
+            "urgency": "={{ $json.urgency }}",
+            "needs_review": "={{ $json.needs_review }}",
+            "category": "={{ $json.category }}",
+            "theme": "={{ $json.theme }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "feedback_id",
+              "displayName": "feedback_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "feedback_text",
+              "displayName": "feedback_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "user_segment",
+              "displayName": "user_segment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "needs_review",
+              "displayName": "needs_review",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "theme",
+              "displayName": "theme",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "65bc257c-71da-4ab3-9a43-2d86d96b3bb9",
+      "name": "Append row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Trigger\nA new Forms response added to the sheet triggers the workflow.",
+        "height": 96,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        -96
+      ],
+      "id": "203578c9-7133-4ce2-bff2-983b81ace63d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Mapping\nInput and output fields are mapped to their corresponding fields.\n",
+        "height": 112,
+        "width": 176,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        224,
+        160
+      ],
+      "id": "0a0d0acc-410c-46dd-887d-0e695949af06",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Processing\nThe regex rules in JavaScript assign a category, urgency, estimate, and theme.",
+        "height": 112,
+        "width": 224,
+        "color": "#B1DFFB"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        368,
+        -128
+      ],
+      "id": "e8eaba3a-9ecd-497b-856d-799f7ceb202a",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Storage\nThe results are stored in a target spreadsheet, where they can be reviewed for analytics and PM decisions.",
+        "height": 128,
+        "color": "#FBE556"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        672,
+        160
+      ],
+      "id": "55c241b7-44b2-48b2-80f0-0dc0e355c5ad",
+      "name": "Sticky Note3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
