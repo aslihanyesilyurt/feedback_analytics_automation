@@ -17,7 +17,7 @@ I designed a workflow that takes customer feedback from a form, organizes it, an
 
 ## What the workflow does
 
-![Screenshot 1](n8n.png)
+![Screenshot 1](screenshots/n8n.png)
 
 <details>
 <summary><b>1. Collects feedback</b></summary>
@@ -105,11 +105,11 @@ This and similar processes can be used by Product Managers and Product Owners or
 
 Here is the Trello dashboard used to add and track tasks, along with workflow documentation.
 
-![Screenshot 2](trello_1.png)
+![Screenshot 2](screenshots/trello_1.png)
 
 ---
 
-![Screenshot 3](trello_2.png)
+![Screenshot 3](screenshots/trello_2.png)
 
 </details>
 
@@ -144,7 +144,7 @@ The scoring weights are working assumptions for this prototype. A Product Manage
 
 I improved the matching rules after identifying gaps. Validation is done through a small set of test examples.
 
-![Screenshot 4](QA.png)
+![Screenshot 4](screenshots/QA.png)
 
 This is a rule-based prototype, not a fully AI-powered or production-ready system. The rules may miss context, misunderstand wording, or assign the wrong theme. Human review remains important.
 
